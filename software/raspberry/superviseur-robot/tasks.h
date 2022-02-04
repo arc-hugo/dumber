@@ -76,6 +76,7 @@ private:
     RT_TASK th_openComRobot;
     RT_TASK th_startRobot;
     RT_TASK th_move;
+    RT_TASK th_checkBattery;
     
     /**********************************************************************/
     /* Mutex                                                              */
@@ -131,6 +132,11 @@ private:
      * @brief Thread handling control of the robot.
      */
     void MoveTask(void *arg);
+    
+    /**
+     * @brief Thread handling battery check of the robot.
+     */
+    void CheckBattery(void *arg);
     
     /**********************************************************************/
     /* Queue services                                                     */
