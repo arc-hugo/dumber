@@ -334,7 +334,6 @@ void Tasks::StartRobotTask(void *arg) {
     /* The task startRobot starts here                                                    */
     /**************************************************************************************/
     while (1) {
-
         Message * msgSend;
         rt_sem_p(&sem_startRobot, TM_INFINITE);
         cout << "Start robot without watchdog (";
@@ -450,7 +449,7 @@ void Tasks::CheckBattery(void *arg) {
             rt_mutex_acquire(&mutex_robot, TM_INFINITE);
             batteryLevel = robot.Write(new Message(MESSAGE_ROBOT_BATTERY_GET));
             rt_mutex_release(&mutex_robot);
-            cout << endl << "Battery level : " << batteryLevel->ToString(); 
+            WriteInQueue(&q_messageToMon, batteryLevel);
         }
         cout << endl << flush;
     }
