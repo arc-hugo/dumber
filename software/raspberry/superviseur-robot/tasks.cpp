@@ -275,6 +275,9 @@ void Tasks::ReceiveFromMonTask(void *arg) {
             rt_mutex_acquire(&mutex_move, TM_INFINITE);
             move = new Message(MESSAGE_ROBOT_STOP) ; 
             rt_mutex_release(&mutex_move);
+            rt_mutex_acquire(&mutex_robotStarted, TM_INFINITE);
+            robotStarted = 0;
+            rt_mutex_release(&mutex_robotStarted);
             // coupe connexion avec le robot et le moniteur
             Close() ; 
             // fermeture serveur 
