@@ -22,12 +22,15 @@
 #define PRIORITY_TSERVER 30
 #define PRIORITY_TOPENCOMROBOT 20
 #define PRIORITY_TMOVE 20
+
+#define PRIORITY_TSENDTOROBOT 23
+#define PRIORITY_TRECEIVEFROMROBOT 26
+
 #define PRIORITY_TSENDTOMON 22
 #define PRIORITY_TRECEIVEFROMMON 25
 #define PRIORITY_TSTARTROBOT 20
 #define PRIORITY_TCAMERA 21
 #define PRIORITY_TBATTERY 10
-#define PRIORITY_TCHECKCONNEXION 15
 
 /*
  * Some remarks:
@@ -105,6 +108,14 @@ void Tasks::Init() {
         cerr << "Error task create: " << strerror(-err) << endl << flush;
         exit(EXIT_FAILURE);
     }
+    if (err = rt_task_create(&th_sendToRobot, "th_sendToRobot", 0, PRIORITY_TSENDTOROBOT, 0)) {
+        cerr << "Error task create: " << strerror(-err) << endl << flush;
+        exit(EXIT_FAILURE);
+    }
+    if (err = rt_task_create(&th_receiveFromRobot, "th_receiveFromRobot", 0, PRIORITY_TRECEIVEFROMROBOT, 0)) {
+        cerr << "Error task create: " << strerror(-err) << endl << flush;
+        exit(EXIT_FAILURE);
+    }
     if (err = rt_task_create(&th_sendToMon, "th_sendToMon", 0, PRIORITY_TSENDTOMON, 0)) {
         cerr << "Error task create: " << strerror(-err) << endl << flush;
         exit(EXIT_FAILURE);
@@ -129,17 +140,17 @@ void Tasks::Init() {
         cerr << "Error task create: " << strerror(-err) << endl << flush;
         exit(EXIT_FAILURE);
     }
-    if (err = rt_task_create(&th_checkRobotConnection, "th_checkRobotConnection", 0, PRIORITY_TCHECKCONNEXION, 0)) {
-        cerr << "Error task create: " << strerror(-err) << endl << flush;
-        exit(EXIT_FAILURE);
-    }
     cout << "Tasks created successfully" << endl << flush;
 
     /**************************************************************************************/
     /* Message queues creation                                                            */
     /**************************************************************************************/
     if ((err = rt_queue_create(&q_messageToMon, "q_messageToMon", sizeof (Message*)*50, Q_UNLIMITED, Q_FIFO)) < 0) {
-        cerr << "Error msg queue create: " << strerror(-err) << endl << flush;
+        cerr << "Error msg queue Mon create: " << strerror(-err) << endl << flush;
+        exit(EXIT_FAILURE);
+    }
+    if ((err = rt_queue_create(&q_messageToRobot, "q_messageToRobot", sizeof (Message*)*50, Q_UNLIMITED, Q_FIFO)) < 0) {
+        cerr << "Error msg queue Robot create: " << strerror(-err) << endl << flush;
         exit(EXIT_FAILURE);
     }
     cout << "Queues created successfully" << endl << flush;
@@ -154,6 +165,14 @@ void Tasks::Run() {
     int err;
 
     if (err = rt_task_start(&th_server, (void(*)(void*)) & Tasks::ServerTask, this)) {
+        cerr << "Error task start: " << strerror(-err) << endl << flush;
+        exit(EXIT_FAILURE);
+    }
+    if (err = rt_task_start(&th_sendToRobot, (void(*)(void*)) & Tasks::SendToRobotTask, this)) {
+        cerr << "Error task start: " << strerror(-err) << endl << flush;
+        exit(EXIT_FAILURE);
+    }
+    if (err = rt_task_start(&th_receiveRobotMon, (void(*)(void*)) & Tasks::ReceiveFromRobotTask, this)) {
         cerr << "Error task start: " << strerror(-err) << endl << flush;
         exit(EXIT_FAILURE);
     }
@@ -181,11 +200,6 @@ void Tasks::Run() {
         cerr << "Error task start: " << strerror(-err) << endl << flush;
         exit(EXIT_FAILURE);
     }
-    if (err = rt_task_start(&th_checkRobotConnection, (void(*)(void*)) & Tasks::CheckRobotConnexion, this)) {
-        cerr << "Error task start: " << strerror(-err) << endl << flush;
-        exit(EXIT_FAILURE);
-    }
-
     cout << "Tasks launched" << endl << flush;
 }
 
@@ -230,6 +244,71 @@ void Tasks::ServerTask(void *arg) {
     monitor.AcceptClient(); // Wait the monitor client
     cout << "Rock'n'Roll baby, client accepted!" << endl << flush;
     rt_sem_broadcast(&sem_serverOk);
+}
+
+/**
+ * @brief Thread sending data to robot.
+ */
+void Tasks::SendToRobotTask(void* arg) {
+    Message *msg;
+    Message *result;
+    cout << "Start " << __PRETTY_FUNCTION__ << endl << flush;
+
+    // Synchronization barrier (waiting that all tasks are starting)
+    rt_sem_p(&sem_barrier, TM_INFINITE);
+    rt_sem_p(&sem_serverOk, TM_INFINITE);
+
+    while (1) {
+        cout << "wait msg to send" << endl << flush;
+        msg = ReadInQueue(&q_messageToRobot);
+        cout << "Send msg to robot: " << msg->ToString() << endl << flush;
+        rt_mutex_acquire(&mutex_robot, TM_INFINITE);
+        result = robot.Write(msg); // The message is deleted with the Write
+        // check si result timeout
+        // envoyer au moniteur 
+        rt_mutex_release(&mutex_robot);
+    }
+}
+
+/**
+ * @brief Thread receiving data from monitor.
+ */
+void Tasks::ReceiveFromRobotTask(void *arg) {
+    Message *msgRcv;
+    
+    cout << "Start " << __PRETTY_FUNCTION__ << endl << flush;
+    // Synchronization barrier (waiting that all tasks are starting)
+    rt_sem_p(&sem_barrier, TM_INFINITE);
+    
+    /**************************************************************************************/
+    /* The task receiveFromMon starts here                                                */
+    /**************************************************************************************/
+    rt_sem_p(&sem_serverOk, TM_INFINITE);
+    cout << "Received message from monitor activated" << endl << flush;
+
+    while (1) {
+        msgRcv = monitor.Read();
+        cout << "Rcv <= " << msgRcv->ToString() << endl << flush;
+
+        if (msgRcv->CompareID(MESSAGE_MONITOR_LOST)) {
+            delete(msgRcv);
+            exit(-1);
+        } else if (msgRcv->CompareID(MESSAGE_ROBOT_COM_OPEN)) {
+            rt_sem_v(&sem_openComRobot);
+        } else if (msgRcv->CompareID(MESSAGE_ROBOT_START_WITHOUT_WD)) {
+            rt_sem_v(&sem_startRobot);
+        } else if (msgRcv->CompareID(MESSAGE_ROBOT_GO_FORWARD) ||
+                msgRcv->CompareID(MESSAGE_ROBOT_GO_BACKWARD) ||
+                msgRcv->CompareID(MESSAGE_ROBOT_GO_LEFT) ||
+                msgRcv->CompareID(MESSAGE_ROBOT_GO_RIGHT) ||
+                msgRcv->CompareID(MESSAGE_ROBOT_STOP)) {
+
+            rt_mutex_acquire(&mutex_move, TM_INFINITE);
+            move = msgRcv->GetID();
+            rt_mutex_release(&mutex_move);
+        }
+        delete(msgRcv); // mus be deleted manually, no consumer
+    }
 }
 
 /**
@@ -462,50 +541,6 @@ void Tasks::CheckBattery(void *arg) {
             cout << endl << "Battery level : " << batteryLevel->ToString(); 
         }
         cout << endl << flush;
-    }
-}
-
-void Tasks::CheckRobotConnexion(void *arg) {
-    int rs, status;
-    int compteur = 0;
-    Message * ping;
-    Message * connLost = new Message(MESSAGE_MONITOR_LOST);
-    
-    cout << "Start " << __PRETTY_FUNCTION__ << endl << flush;
-    // Synchronization barrier (waiting that all tasks are starting)
-    rt_sem_p(&sem_barrier, TM_INFINITE);
-    
-    /**************************************************************************************/
-    /* The task starts here                                                               */
-    /**************************************************************************************/
-    rt_task_set_periodic(NULL, TM_NOW, 500000000);
-
-    while (1) {
-        rt_task_wait_period(NULL);
-        rt_mutex_acquire(&mutex_robotStarted, TM_INFINITE);
-        rs = robotStarted;
-        rt_mutex_release(&mutex_robotStarted);
-        if (rs == 1) {
-            cout << "PING" << endl << flush;
-            rt_mutex_acquire(&mutex_robot, TM_INFINITE);
-            ping = robot.Ping();
-
-            if (ping->GetID() == MESSAGE_ANSWER_ROBOT_TIMEOUT){
-                cout << "NO ACK" << endl << flush;
-                compteur ++;
-            }
-            else{
-                compteur = 0;
-            }
-            // close_communication_robot()
-            if (compteur > 2){
-                WriteInQueue(&q_messageToMon,connLost); 
-                monitor.Close();
-                rt_mutex_acquire(&mutex_robotStarted, TM_INFINITE);
-                robotStarted = 0;
-                rt_mutex_release(&mutex_robotStarted);
-            }
-        }
     }
 }
 

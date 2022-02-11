@@ -76,6 +76,7 @@ private:
     RT_TASK th_openComRobot;
     RT_TASK th_startRobot;
     RT_TASK th_move;
+    RT_TASK th_checkBattery;
     
     /**********************************************************************/
     /* Mutex                                                              */
@@ -98,6 +99,7 @@ private:
     /**********************************************************************/
     int MSG_QUEUE_SIZE;
     RT_QUEUE q_messageToMon;
+    RT_QUEUE q_messageToRobot;
     
     /**********************************************************************/
     /* Tasks' functions                                                   */
@@ -106,6 +108,16 @@ private:
      * @brief Thread handling server communication with the monitor.
      */
     void ServerTask(void *arg);
+
+    /**
+     * @brief Thread sending data to monitor.
+     */
+    void SendToRobotTask(void *arg);
+        
+    /**
+     * @brief Thread receiving data from monitor.
+     */
+    void ReceiveFromRobotTask(void *arg);
      
     /**
      * @brief Thread sending data to monitor.
