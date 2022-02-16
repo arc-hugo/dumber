@@ -284,8 +284,8 @@ void Tasks::SendToRobotTask(void* arg) {
                 compteur++;
             } else {
                 compteur = 0;
-                WriteInQueue(&q_messageToMon, msg);
             }
+            WriteInQueue(&q_messageToMon, result);
             if (compteur > 2) {
                 WriteInQueue(&q_messageToMon, connLost);
                 monitor.Close();
