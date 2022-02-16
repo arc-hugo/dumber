@@ -24,7 +24,7 @@
 #define PRIORITY_TMOVE 20
 
 #define PRIORITY_TSENDTOROBOT 23
-#define PRIORITY_TRECEIVEFROMROBOT 26
+// #define PRIORITY_TRECEIVEFROMROBOT 26
 
 #define PRIORITY_TSENDTOMON 22
 #define PRIORITY_TRECEIVEFROMMON 25
@@ -112,10 +112,10 @@ void Tasks::Init() {
         cerr << "Error task create: " << strerror(-err) << endl << flush;
         exit(EXIT_FAILURE);
     }
-    if (err = rt_task_create(&th_receiveFromRobot, "th_receiveFromRobot", 0, PRIORITY_TRECEIVEFROMROBOT, 0)) {
-        cerr << "Error task create: " << strerror(-err) << endl << flush;
-        exit(EXIT_FAILURE);
-    }
+    // if (err = rt_task_create(&th_receiveFromRobot, "th_receiveFromRobot", 0, PRIORITY_TRECEIVEFROMROBOT, 0)) {
+    //     cerr << "Error task create: " << strerror(-err) << endl << flush;
+    //     exit(EXIT_FAILURE);
+    // }
     if (err = rt_task_create(&th_sendToMon, "th_sendToMon", 0, PRIORITY_TSENDTOMON, 0)) {
         cerr << "Error task create: " << strerror(-err) << endl << flush;
         exit(EXIT_FAILURE);
@@ -172,10 +172,10 @@ void Tasks::Run() {
         cerr << "Error task start: " << strerror(-err) << endl << flush;
         exit(EXIT_FAILURE);
     }
-    if (err = rt_task_start(&th_receiveFromRobot, (void(*)(void*)) & Tasks::ReceiveFromRobotTask, this)) {
-        cerr << "Error task start: " << strerror(-err) << endl << flush;
-        exit(EXIT_FAILURE);
-    }
+    // if (err = rt_task_start(&th_receiveFromRobot, (void(*)(void*)) & Tasks::ReceiveFromRobotTask, this)) {
+    //     cerr << "Error task start: " << strerror(-err) << endl << flush;
+    //     exit(EXIT_FAILURE);
+    // }
     if (err = rt_task_start(&th_sendToMon, (void(*)(void*)) & Tasks::SendToMonTask, this)) {
         cerr << "Error task start: " << strerror(-err) << endl << flush;
         exit(EXIT_FAILURE);

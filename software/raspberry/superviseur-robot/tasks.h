@@ -72,7 +72,7 @@ private:
     /**********************************************************************/
     RT_TASK th_server;
     RT_TASK th_sendToRobot;
-    RT_TASK th_receiveFromRobot;
+    // RT_TASK th_receiveFromRobot;
     RT_TASK th_sendToMon;
     RT_TASK th_receiveFromMon;
     RT_TASK th_openComRobot;
