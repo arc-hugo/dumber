@@ -250,16 +250,18 @@ void Tasks::ServerTask(void *arg) {
  * @brief Thread sending data to robot.
  */
 void Tasks::SendToRobotTask(void* arg) {
+    int rs;
+    int compteur;
     Message *msg;
     Message *result;
+    Message *connLost = new Message(MESSAGE_MONITOR_LOST);
     cout << "Start " << __PRETTY_FUNCTION__ << endl << flush;
 
     // Synchronization barrier (waiting that all tasks are starting)
     rt_sem_p(&sem_barrier, TM_INFINITE);
-    rt_sem_p(&sem_serverOk, TM_INFINITE);
-
+   
     while (1) {
-
+        rt_sem_p(&sem_openComRobot, TM_INFINITE);
         rt_mutex_acquire(&mutex_robotStarted, TM_INFINITE);
         rs = robotStarted;
         rt_mutex_release(&mutex_robotStarted);
@@ -282,9 +284,8 @@ void Tasks::SendToRobotTask(void* arg) {
                 compteur = 0;
                 WriteInQueue(&q_messageToMon, msg);
             }
-
             if (compteur > 2){
-                WriteInQueue(&q_messageToMon,connLost); 
+                WriteInQueue(&q_messageToMon,connLost);
                 monitor.Close();
                 rt_mutex_acquire(&mutex_robotStarted, TM_INFINITE);
                 robotStarted = 0;
@@ -369,7 +370,7 @@ void Tasks::ReceiveFromMonTask(void *arg) {
             delete(msgRcv);
             exit(-1);
         } else if (msgRcv->CompareID(MESSAGE_ROBOT_COM_OPEN)) {
-            rt_sem_v(&sem_openComRobot);
+            rt_sem_broadcast(&sem_openComRobot);
         } else if (msgRcv->CompareID(MESSAGE_ROBOT_START_WITHOUT_WD)) {
             rt_sem_v(&sem_startRobot);
         } else if (msgRcv->CompareID(MESSAGE_ROBOT_GO_FORWARD) ||
@@ -552,7 +553,3 @@ void Tasks::CheckBattery(void *arg) {
         cout << endl << flush;
     }
 }
-
-// Au lieu d'envoyer un message dans chaque thread 
-// On mets le message dans une queue (nouveau thread apériodique)
-// Ce thread aperiodique prend un message dans la queue, envoie, check réponse (si timeout) et envoie direct au moniteur
