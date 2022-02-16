@@ -282,6 +282,17 @@ void Tasks::ReceiveFromMonTask(void *arg) {
 
         if (msgRcv->CompareID(MESSAGE_MONITOR_LOST)) {
             delete(msgRcv);
+            cout << "ERROR : Perte de communication entre le moniteur et le superviseur" ;
+            // stop robot 
+            rt_mutex_acquire(&mutex_move, TM_INFINITE);
+            move = (new Message(MESSAGE_ROBOT_STOP))->GetID() ; 
+            rt_mutex_release(&mutex_move);
+            rt_mutex_acquire(&mutex_robotStarted, TM_INFINITE);
+            robotStarted = 0;
+            rt_mutex_release(&mutex_robotStarted);
+            // coupe connexion avec le robot et le moniteur
+            Stop();
+            // fermeture serveur 
             exit(-1);
         } else if (msgRcv->CompareID(MESSAGE_ROBOT_COM_OPEN)) {
             rt_sem_v(&sem_openComRobot);
