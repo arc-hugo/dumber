@@ -271,7 +271,6 @@ void Tasks::SendToRobotTask(void* arg) {
         rt_mutex_release(&mutex_robotStarted);
 
         if (rs == 1) {
-            cout << "wait msg to send" << endl << flush;
             msg = ReadInQueue(&q_messageToRobot);
             cout << "Send msg to robot: " << msg->ToString() << endl << flush;
 
@@ -339,7 +338,6 @@ void Tasks::SendToMonTask(void* arg) {
     rt_sem_p(&sem_serverOk, TM_INFINITE);
 
     while (1) {
-        cout << "wait msg to send" << endl << flush;
         msg = ReadInQueue(&q_messageToMon);
         cout << "Send msg to mon: " << msg->ToString() << endl << flush;
         rt_mutex_acquire(&mutex_monitor, TM_INFINITE);
@@ -473,8 +471,7 @@ void Tasks::StartWithoutWD() {
     rt_mutex_release(&mutex_robot);
     cout << msgSend->GetID();
     cout << ")" << endl;
-
-    cout << "Movement answer: " << msgSend->ToString() << endl << flush;
+    
     WriteInQueue(&q_messageToMon, msgSend); // msgSend will be deleted by sendToMon
 
     if (msgSend->GetID() == MESSAGE_ANSWER_ACK) {
@@ -497,7 +494,6 @@ void Tasks::StartWithWD() {
     cout << msgSend->GetID();
     cout << ")" << endl;
 
-    cout << "Movement answer: " << msgSend->ToString() << endl << flush;
     WriteInQueue(&q_messageToMon, msgSend); // msgSend will be deleted by sendToMon
 
     if (msgSend->GetID() == MESSAGE_ANSWER_ACK) {
